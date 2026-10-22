@@ -3,31 +3,78 @@ package ma.emsi.chibel.tp0chibel.service;
 import jakarta.enterprise.context.Dependent;
 
 import java.io.Serializable;
-import java.util.Locale;
 
 /**
- * Classe de service pour les modificateurs de question.
- * Un modificateur de question prend en entrée une question et retourne
- * la question modifiée.
+ * Classe de service qui construit la réponse à une question.
+ * Traitement choisi : analyse de la question (mots, voyelles, consonnes, mot le plus long)
+ * suivie d'un chiffrement de César dont le décalage dépend du nombre de mots.
  */
-@Dependent // Portée CDI pour rendre la classe injectable par CDI dans les autres classes.
-// Portée Dependent : l'instance sera supprimée quand la classe qui l'a injectée sera supprimée.
-public class GenerateurReponse implements Serializable { // Car CDI peut mettre l'instance en mémoire secondaire.
+@Dependent // Portée CDI : l'instance est supprimée quand le backing bean qui l'a injectée est supprimé.
+public class GenerateurReponse implements Serializable {
+
+    private static final String VOYELLES = "aeiouyàâäéèêëîïôöùûüÿœæ";
+
     /**
-     * Modificateur de question.
-     * @param question La question à modifier.
-     * @param roleSysteme Le rôle système à utiliser pour la modification de la question.
-     * @return La question modifiée : le rôle système en majuscule au début de la question, s'il n'est pas null,
-     * suivi d'un saut de ligne,
-     * puis la question en minuscule, le tout entouré de "||".
+     * Analyse la question puis la chiffre avec un César.
+     *
+     * @param question    La question de l'utilisateur.
+     * @param roleSysteme Le rôle système (non null seulement pour la première question), ou null.
+     * @return Le rapport d'analyse suivi de la question chiffrée.
      */
     public String genererReponse(String question, String roleSysteme) {
-        String resultat = "||";
-        if (roleSysteme != null) {
-            // Ajouter le rôle système en majuscule au début du résultat, suivi d'un saut de ligne.
-            resultat += roleSysteme.toUpperCase(Locale.FRENCH) + "\n";
+        String[] mots = question.trim().split("\\s+");
+        int nbMots = mots.length;
+
+        int nbVoyelles = 0;
+        int nbConsonnes = 0;
+        for (char c : question.toCharArray()) {
+            if (Character.isLetter(c)) {
+                if (VOYELLES.indexOf(Character.toLowerCase(c)) >= 0) {
+                    nbVoyelles++;
+                } else {
+                    nbConsonnes++;
+                }
+            }
         }
-        resultat += question.toLowerCase(Locale.FRENCH) + "||";
-        return resultat;
+
+        String motLePlusLong = "";
+        for (String mot : mots) {
+            String propre = mot.replaceAll("[^\\p{L}]", "");
+            if (propre.length() > motLePlusLong.length()) {
+                motLePlusLong = propre;
+            }
+        }
+
+        int decalage = (nbMots % 25) + 1;
+
+        StringBuilder resultat = new StringBuilder("-- Analyse --\n");
+        if (roleSysteme != null) {
+            String premiereLigne = roleSysteme.strip().lines().findFirst().orElse("");
+            resultat.append("Rôle : ").append(premiereLigne).append("\n");
+        }
+        resultat.append("Mots : ").append(nbMots).append("\n");
+        resultat.append("Voyelles : ").append(nbVoyelles).append("\n");
+        resultat.append("Consonnes : ").append(nbConsonnes).append("\n");
+        resultat.append("Mot le plus long : ").append(motLePlusLong).append("\n");
+        resultat.append("Code César (décalage ").append(decalage).append(") : ")
+                .append(cesar(question, decalage)).append("\n");
+        return resultat.toString();
+    }
+
+    /**
+     * Chiffrement de César : décale les lettres a-z et A-Z, laisse le reste inchangé.
+     */
+    private String cesar(String texte, int decalage) {
+        StringBuilder sb = new StringBuilder();
+        for (char c : texte.toCharArray()) {
+            if (c >= 'a' && c <= 'z') {
+                sb.append((char) ('a' + (c - 'a' + decalage) % 26));
+            } else if (c >= 'A' && c <= 'Z') {
+                sb.append((char) ('A' + (c - 'A' + decalage) % 26));
+            } else {
+                sb.append(c);
+            }
+        }
+        return sb.toString();
     }
 }
